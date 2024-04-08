@@ -1,3 +1,5 @@
+import time
+
 import requests
 
 import config
@@ -22,7 +24,7 @@ STAT_NAMES = [
 ]
 
 
-def search_items():
+def search_items(max_retries=10, retry_delay=2):
     params = {'s': config.SERVER_NO, 'page': 0, 'c': 0}
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Whale/3.25.232.19 Safari/537.36',
@@ -30,12 +32,20 @@ def search_items():
     }
     items = []
     while True:
-        response = requests.post(SEARCH_URL, params=params, data=config.SEARCH_PARAMS, headers=headers)
-        response_json = response.json()
-        items += response_json
-        if len(response_json) < 30:
-            break
-        params['page'] += 1
+        try:
+            response = requests.post(SEARCH_URL, params=params, data=config.SEARCH_PARAMS, headers=headers)
+            response.raise_for_status()
+            response_json = response.json()
+            items += response_json
+            if len(response_json) < 30:
+                break
+            params['page'] += 1
+        except requests.RequestException as e:
+            max_retries -= 1
+            if max_retries == 0:
+                raise e
+            time.sleep(retry_delay)
+            retry_delay *= 2
 
     return items
 
