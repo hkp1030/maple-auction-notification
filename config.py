@@ -3,8 +3,9 @@ import os
 
 load_dotenv()
 
-# 텔레그램 봇 토큰
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+# 텔레그램 정보
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 # 반복 주기
 INTERVAL_SEC = int(os.getenv('INTERVAL_SEC'))
