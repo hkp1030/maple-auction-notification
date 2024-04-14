@@ -35,7 +35,7 @@ def search_items(max_retries=10, retry_delay=2):
         try:
             response = requests.post(SEARCH_URL, params=params, data=config.SEARCH_PARAMS, headers=headers)
             response.raise_for_status()
-            response_json = response.json()
+            response_json = response.json() or []
             items += response_json
             if len(response_json) < 30:
                 break
