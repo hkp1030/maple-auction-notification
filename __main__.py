@@ -11,12 +11,12 @@ async def main():
     shown_items = set()
     while True:
         items = search.search_items()
-        if items:
-            for item in items:
-                if item['seq'] not in shown_items:
-                    shown_items.add(item['seq'])
-                    text = search.format_item(item)
-                    await message.send_message(text)
+        for item in items:
+            if item['seq'] in shown_items:
+                continue
+            shown_items.add(item['seq'])
+            text = search.format_item(item)
+            await message.send_message(text)
         time.sleep(interval)
 
 

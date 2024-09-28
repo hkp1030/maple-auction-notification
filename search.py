@@ -1,10 +1,12 @@
-import time
+from urllib.parse import parse_qs
 
 import requests
+from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3 import Retry
 
 import config
 
-SEARCH_URL = 'https://xn--hz2b1j494a9mhnwh.com/load_auction_items'
 STAT_NAMES = [
     ('incstr', 'base_incstr', 'rebirthstr', '', 'STR'),
     ('incdex', 'base_incdex', 'rebirthdex', '', 'DEX'),
@@ -23,31 +25,84 @@ STAT_NAMES = [
     ('incstatr', 'base_statr', 'rebirthstatr', '%', '올스탯'),
 ]
 
+SERVERS = {
+    'scania': 1,
+    'bera': 2,
+    'luna': 3,
+    'zenith': 4,
+    'croa': 5,
+    'union': 6,
+    'elysium': 7,
+    'enosis': 8,
+    'red': 9,
+    'aurora': 10,
+    'arcane': 11,
+    'nova': 12,
+    'reboot1': 13,
+    'reboot2': 14,
+}
 
-def search_items(max_retries=10, retry_delay=2):
-    params = {'s': config.SERVER_NO, 'page': 0, 'c': 0}
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Whale/3.25.232.19 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    }
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Whale/3.25.232.19 Safari/537.36',
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+}
+
+
+def requests_with_retries(method, url, session=None, retries=10, backoff_factor=1,
+                          status_forcelist=(500, 502, 503, 504), **kwargs):
+    session = session or requests.Session()
+
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+        allowed_methods=["HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE", "PATCH"]
+    )
+
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+
+    headers = kwargs.pop('headers', {})
+    headers.update(HEADERS)
+    kwargs['headers'] = headers
+
+    response = session.request(method, url, **kwargs)
+
+    return response
+
+
+def search_items():
+    url = 'https://xn--hz2b1j494a9mhnwh.com/skin/board/Maple-Basic-List-PC/getList.php'
+    data = {k: v[0] if len(v) == 1 else v for k, v in parse_qs(config.SEARCH_PARAMS).items()}
+    data['page'] = 1
     items = []
     while True:
-        try:
-            response = requests.post(SEARCH_URL, params=params, data=config.SEARCH_PARAMS, headers=headers)
-            response.raise_for_status()
-            response_json = response.json() or []
-            items += response_json
-            if len(response_json) < 30:
-                break
-            params['page'] += 1
-        except requests.RequestException as e:
-            max_retries -= 1
-            if max_retries == 0:
-                raise e
-            time.sleep(retry_delay)
-            retry_delay *= 2
+        response = requests_with_retries('POST', url, data=data)
+        response.raise_for_status()
+        html = response.text
+        soup = BeautifulSoup(html, 'html.parser')
+        seqs = [int(item['data-xqad']) for item in soup.find_all('li', class_='auction-item')]
+        for seq in seqs:
+            item = get_item_info(seq, data['bo_table'], data['search_type'])
+            items.append(item)
+        if len(seqs) < 15:
+            break
+        data['page'] += 1
 
     return items
+
+
+def get_item_info(item_seq, server, item_type):
+    url = 'https://xn--hz2b1j494a9mhnwh.com/maple/item_descrip.php'
+    if isinstance(server, str):
+        server = SERVERS[server]
+    params = {'seq': item_seq, 'server': server, 'type': item_type}
+    response = requests_with_retries('POST', url, params=params)
+    response.raise_for_status()
+    return response.json()[0]
 
 
 def format_item(item):
@@ -58,8 +113,7 @@ def format_item(item):
         result += f' ⭐{item["star"]}'
     result += ']\n'
 
-    result += f'가격 : {format_number_korean(item["onceprice"])}\n'
-    result += f'남은 시간 : {item["lefttime"]}\n'
+    result += f'가격 : {format_number_korean(item["oncePrice"])}\n'
     result += f'장비 분류 : {item["gear_type_desc"]}\n'
 
     for stat, base, additional, suffix, name in STAT_NAMES:
