@@ -1,5 +1,4 @@
 import asyncio
-import time
 
 import config
 import message
@@ -17,7 +16,7 @@ async def main():
             shown_items.add(item['seq'])
             text = search.format_item(item)
             await message.send_message(text)
-        time.sleep(interval)
+        await asyncio.sleep(interval)
 
 
 if __name__ == '__main__':
