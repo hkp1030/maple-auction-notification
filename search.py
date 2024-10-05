@@ -75,22 +75,18 @@ def requests_with_retries(method, url, session=None, retries=10, backoff_factor=
 
 
 def search_items():
-    url = 'https://xn--hz2b1j494a9mhnwh.com/skin/board/Maple-Basic-List-PC/getList.php'
-    data = {k: v[0] if len(v) == 1 else v for k, v in parse_qs(config.SEARCH_PARAMS).items()}
-    data['page'] = 1
-    items = []
-    while True:
-        response = requests_with_retries('POST', url, data=data)
-        response.raise_for_status()
-        html = response.text
-        soup = BeautifulSoup(html, 'html.parser')
-        seqs = [int(item['data-xqad']) for item in soup.find_all('li', class_='auction-item')]
-        for seq in seqs:
-            item = get_item_info(seq, data['bo_table'], data['search_type'])
-            items.append(item)
-        if len(seqs) < 15:
-            break
-        data['page'] += 1
+    data = {k: v[0] for k, v in parse_qs(config.SEARCH_PARAMS).items()}
+    server = data['bo_table']
+    url = f'https://xn--hz2b1j494a9mhnwh.com/{server}'
+
+    response = requests_with_retries('POST', url, data=data)
+    response.raise_for_status()
+
+    html = response.text
+    soup = BeautifulSoup(html, 'html.parser')
+
+    seqs = [int(item['data-xqad']) for item in soup.find_all('li', class_='auction-item')]
+    items = [get_item_info(seq, data['bo_table'], data['search_type']) for seq in seqs]
 
     return items
 
