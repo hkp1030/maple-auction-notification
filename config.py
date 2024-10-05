@@ -12,3 +12,7 @@ INTERVAL_SEC = int(os.getenv('INTERVAL_SEC'))
 
 # 검색 파라미터
 SEARCH_PARAMS = os.getenv('SEARCH_PARAMS')
+
+# 로그 설정
+LOG_DIR = os.getenv('LOG_DIR', 'logs')
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
