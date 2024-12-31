@@ -1,3 +1,4 @@
+import re
 from urllib.parse import parse_qs
 
 import requests
@@ -26,20 +27,8 @@ STAT_NAMES = [
 ]
 
 SERVERS = {
-    'scania': 1,
-    'bera': 2,
-    'luna': 3,
-    'zenith': 4,
-    'croa': 5,
-    'union': 6,
-    'elysium': 7,
-    'enosis': 8,
-    'red': 9,
-    'aurora': 10,
-    'arcane': 11,
-    'nova': 12,
-    'reboot1': 13,
-    'reboot2': 14,
+    'normal': 1,
+    'reboot': 2,
 }
 
 HEADERS = {
@@ -85,17 +74,36 @@ def search_items():
     html = response.text
     soup = BeautifulSoup(html, 'html.parser')
 
-    seqs = [int(item['data-xqad']) for item in soup.find_all('li', class_='auction-item')]
-    items = [get_item_info(seq, data['bo_table'], data['search_type']) for seq in seqs]
+    item_urls = [item['data-xqad'] for item in soup.find_all('li', class_='auction-item')]
+    item_ids = [get_item_id(item_url) for item_url in item_urls]
+    items = [get_item_info(item_id, data['bo_table'], data['search_type']) for item_id in item_ids]
 
     return items
 
 
-def get_item_info(item_seq, server, item_type):
+def get_item_id(item_url):
+    response = requests_with_retries('GET', item_url)
+    response.raise_for_status()
+
+    html = response.text
+
+    soup = BeautifulSoup(html, 'html.parser')
+    scripts = soup.find_all('script')
+
+    for script in scripts:
+        if script.string:
+            match = re.search(r'findItemDescrip\((\d+)\)', script.string)
+            if match:
+                return match.group(1)
+
+    raise ValueError('Item ID not found')
+
+
+def get_item_info(item_id, server, item_type):
     url = 'https://xn--hz2b1j494a9mhnwh.com/maple/item_descrip.php'
     if isinstance(server, str):
         server = SERVERS[server]
-    params = {'seq': item_seq, 'server': server, 'type': item_type}
+    params = {'seq': item_id, 'server': server, 'type': item_type}
     response = requests_with_retries('POST', url, params=params)
     response.raise_for_status()
     return response.json()[0]
